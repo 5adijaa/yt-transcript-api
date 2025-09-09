@@ -16,5 +16,9 @@
   "bugs": {
     "url": "https://github.com/5adijaa/yt-transcript-api/issues"
   },
-  "homepage": "https://github.com/5adijaa/yt-transcript-api#readme"
+  "homepage": "https://github.com/5adijaa/yt-transcript-api#readme",
+  "dependencies": {
+    "undici": "^6.21.3",
+    "youtube-transcript": "^1.2.1"
+  }
 }
