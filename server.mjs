@@ -231,13 +231,51 @@ app.get("/api/transcript", async (req, res) => {
       }
     }
 
+    // const base = new URL(track.baseUrl);
+    // if (wantLang) base.searchParams.set("lang", wantLang);
+
+    // const tries = [
+    //   base.toString(),
+    //   (()=>{ const u=new URL(base); u.searchParams.set("fmt","json3"); return u.toString(); })(),
+    //   (()=>{ const u=new URL(base); u.searchParams.set("fmt","vtt"); return u.toString(); })(),
+    // ];
+
+    // --- Build aggressive fallback list of timedtext URLs
     const base = new URL(track.baseUrl);
+
+    // prefer requested lang when given
     if (wantLang) base.searchParams.set("lang", wantLang);
 
+    // helpers
+    const withParam = (u, k, v) => { const x=new URL(u); x.searchParams.set(k,v); return x; };
+
+    const lang = wantLang || track.languageCode || "en";
+    const isASR = !!track.kind; // 'asr' for auto-generated
+
     const tries = [
-      base.toString(),
-      (()=>{ const u=new URL(base); u.searchParams.set("fmt","json3"); return u.toString(); })(),
-      (()=>{ const u=new URL(base); u.searchParams.set("fmt","vtt"); return u.toString(); })(),
+    // 1) Whatever YouTube suggested
+    base.toString(),
+
+    // 2) Force formats
+    withParam(base, "fmt", "json3").toString(),
+    withParam(base, "fmt", "vtt").toString(),
+
+    // 3) Force lang explicitly
+    (() => { const u=new URL(base); u.searchParams.set("lang", lang); u.searchParams.set("fmt","json3"); return u.toString(); })(),
+    (() => { const u=new URL(base); u.searchParams.set("lang", lang); u.searchParams.set("fmt","vtt");   return u.toString(); })(),
+
+    // 4) Ask YouTube to translate to our target (sometimes returns where lang fails)
+    (() => { const u=new URL(base); u.searchParams.set("tlang", lang); u.searchParams.set("fmt","json3"); return u.toString(); })(),
+    (() => { const u=new URL(base); u.searchParams.set("tlang", lang); u.searchParams.set("fmt","vtt");   return u.toString(); })(),
+
+    // 5) Explicit “auto captions” knobs
+    ...(isASR ? [
+        (() => { const u=new URL(base); u.searchParams.set("caps","asr"); u.searchParams.set("kind","asr"); u.searchParams.set("fmt","json3"); return u.toString(); })(),
+        (() => { const u=new URL(base); u.searchParams.set("caps","asr"); u.searchParams.set("kind","asr"); u.searchParams.set("fmt","vtt");   return u.toString(); })(),
+        // fully constructed classic form (sometimes works when baseUrl doesn’t)
+        `https://www.youtube.com/api/timedtext?v=${encodeURIComponent(id)}&lang=${encodeURIComponent(lang)}&fmt=json3&caps=asr&kind=asr`,
+        `https://www.youtube.com/api/timedtext?v=${encodeURIComponent(id)}&lang=${encodeURIComponent(lang)}&fmt=vtt&caps=asr&kind=asr`,
+    ] : [])
     ];
 
     for (const u of tries) {
